@@ -9,6 +9,15 @@ from dbconfig import dbconfig
 console = Console();
 
 # functions definitions
+def add_entry():
+    name=input("name:")
+    email=input("e-mail: ")
+    password=getpass("password: ")
+    url=input("url: ")
+    username=input("username:")
+    query="insert into passman.entries (name,email,password,url,username) values (%s,%s,%s,%s,%s)"
+    hashed_password=argon.a2_hash(password)
+
 
 
 # creating the tables
@@ -52,7 +61,7 @@ def encrypt(password):
     return hash
 
 
-def get_salted_dk(email):
+def get_mp_hash(email):
     query = "select secret_key from passman.vault where email=%s"
     db = dbconfig()
     cursor = db.cursor()
@@ -79,7 +88,7 @@ def login():
     print(hashed_mp)
     master_password = getpass("master password:")
 
-    while not argon.authenticate(get_salted_dk(email), email + master_password):
+    while not argon.authenticate(get_mp_hash(email), email + master_password):
         printr("[yellow] [-] wrong credentials please try again")
         email = input("email:")
         master_password = getpass("master password:")
@@ -99,14 +108,14 @@ elif choice == 2:
             print("password is empty or does not match! ")
 
     # encrypt the master password
-    hashed_mp = argon.generate_derivation_key(email + master_password)
+    master_password_hash = argon.a2_hash(email+master_password)
 
     # derive secret key
-    ds = argon.generate_salted_dk(email + master_password)
+    #ds = argon.a2_hash(vault_key, master_password)
 
     # store it in the vault database
     query = "insert into passman.vault (email,master_key,secret_key) values (%s,%s,%s)"
-    val = (email, hashed_mp, ds)
+    val = (email, "hello",master_password_hash)
     db = dbconfig()
     cursor = db.cursor()
     cursor.execute(query, val)
