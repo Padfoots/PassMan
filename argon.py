@@ -1,27 +1,29 @@
-import binascii
-
 import argon2
+import base64
 
 
 class argon:
     argon2Hasher=argon2.PasswordHasher(time_cost=16, memory_cost=2**15, parallelism=2, hash_len=32, salt_len=16)
 
-# for creating the derivation key raw hash
-    def a2bkdf(email_mp):
+# for creating derivation key used to encrypt/decrypt the passwords in the vault
+    def vault_key(email,master_password):
+        master_key=argon.master_key(email,master_password)
+        x=email+master_password+master_key
 
         derivation_key=argon2.hash_password_raw(time_cost=16,memory_cost=2**15,parallelism=2,hash_len=32,
-                                      password=email_mp.encode(),salt=b'some salt',type=argon2.low_level.Type.ID)
-        print("Argon2 raw hash: ",derivation_key)
-        return binascii.hexlify(derivation_key)
-    def authenticate(derivation_key,password):
+                                      password=x.encode(),salt=b'some salt',type=argon2.low_level.Type.ID)
+
+        return base64.urlsafe_b64encode(derivation_key)
+
+    # use the master_key hash and the password entered by user to verify the log in
+    def authenticate(master_key, password):
             try:
-                x=argon.argon2Hasher.verify(derivation_key,password)
+                x=argon.argon2Hasher.verify(master_key, password)
             except Exception as e:
                 return False
             return x
 
-# for hashing passwords in the vault and verifying the master password whe logging in
-    def a2_hash(password):
-        hashed_password= argon.argon2Hasher.hash(password)
-        print("Argon2 hash (random salt):", hashed_password)
-        return hashed_password
+# hashing the concatenation of the email and master password--> to produce master_key used for authentication
+    def master_key(email,master_password):
+        master_key= argon.argon2Hasher.hash(email+master_password)
+        return master_key

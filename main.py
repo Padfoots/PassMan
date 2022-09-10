@@ -5,18 +5,32 @@ from rich import print as printr
 from rich.console import Console
 from argon import argon
 from dbconfig import dbconfig
+from cryptography.fernet import Fernet
 
 console = Console();
 
 # functions definitions
-def add_entry():
+def add_entry(mail,master_password):
     name=input("name:")
     email=input("e-mail: ")
     password=getpass("password: ")
     url=input("url: ")
     username=input("username:")
-    query="insert into passman.entries (name,email,password,url,username) values (%s,%s,%s,%s,%s)"
-    hashed_password=argon.a2_hash(password)
+    query="insert into passman.records (site_name,email,hashed_password,url,username) values (%s,%s,%s,%s,%s)"
+    vault_key=argon.vault_key(mail,master_password)
+    encry_pass=Fernet(vault_key).encrypt(password.encode())
+    print("encrypted password ", encry_pass)
+    decry_pass=Fernet(vault_key).decrypt(encry_pass).decode()
+    print("decrypted password: " ,decry_pass)
+
+    val=name,email,encry_pass,url,username
+    db=dbconfig()
+    cursor=db.cursor()
+    cursor.execute(query,val)
+    printr("[green][+] entry is added succesfully")
+    cursor.close()
+    db.commit()
+    db.close()
 
 
 
@@ -55,11 +69,6 @@ def get_master(email):
     return mk
 
 
-# hash the master password to be saved in the db
-def encrypt(password):
-    hash = hashlib.sha256(password.encode()).hexdigest()
-    return hash
-
 
 def get_mp_hash(email):
     query = "select secret_key from passman.vault where email=%s"
@@ -77,7 +86,8 @@ def get_mp_hash(email):
 
 # menu
 
-printr("[blue] welcome to passman ")
+printr(
+"""[blue]**************************************************************** welcome to passman ****************************************************************""")
 choice = int(input("1-log-in to vault\n2-create a new vault\n"))
 
 
@@ -88,34 +98,28 @@ def login():
     print(hashed_mp)
     master_password = getpass("master password:")
 
-    while not argon.authenticate(get_mp_hash(email), email + master_password):
+    while not argon.authenticate(get_mp_hash(email),email+master_password):
         printr("[yellow] [-] wrong credentials please try again")
         email = input("email:")
         master_password = getpass("master password:")
     print("welcome back homie")
+    input("1-enter a new entry")
+    add_entry(email,master_password)
 
 
-if choice == 1:
-    login()
-elif choice == 2:
+def register():
+    global db, cursor
     email = input("email:")
     flag = True;
-
     while flag:
         master_password = getpass("master password:")
         flag = master_password == "" or master_password != getpass("re-type:")
         if flag:
             print("password is empty or does not match! ")
-
-    # encrypt the master password
-    master_password_hash = argon.a2_hash(email+master_password)
-
-    # derive secret key
-    #ds = argon.a2_hash(vault_key, master_password)
-
+    master_key = argon.master_key(email, master_password)
     # store it in the vault database
     query = "insert into passman.vault (email,master_key,secret_key) values (%s,%s,%s)"
-    val = (email, "hello",master_password_hash)
+    val = (email, "hello", master_key)
     db = dbconfig()
     cursor = db.cursor()
     cursor.execute(query, val)
@@ -125,22 +129,8 @@ elif choice == 2:
     printr("[green] [+] your credentials has been saved please log-in to access your vault")
     login()
 
-# prompt the user to choose register/sign in
-# create the register menu
-# enter email
-# enter master password
-# hash the master password
-# derive a secret key
-# store the (email,masterpass,secret key) into the vault table
-# create the log in menu
-# enter email
-# enter master password
-# check credentials in the vault table
-# credentials if right enter the vault
-# if wrong prompt the user again
-# enter the vault
-# prompt for a name of a website
-# check the entries table against the name
-# if name exists and unique dehash the password hash and copy it to clipboard
-# if name exists but different emails display all emails with the name
-# if name doesn't exist prompt user again for a name
+
+if choice == 1:
+    login()
+elif choice == 2:
+    register()
