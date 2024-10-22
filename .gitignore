@@ -1,0 +1,5 @@
+/mysql-db
+docker-compose.yaml
+Dockerfile
+db_schema.drawio
+.venv
