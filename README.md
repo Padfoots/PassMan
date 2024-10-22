@@ -1,7 +1,3 @@
-Here's a structured documentation guide for setting up a password manager project from cloning the repository to configuring the database credentials. You can adjust the content to fit your specific application and preferences.
-
----
-
 # Password Manager Setup Documentation
 
 ## Prerequisites
